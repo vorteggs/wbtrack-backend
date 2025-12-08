@@ -14,15 +14,33 @@ const transporter = nodemailer.createTransport({
 });
 
 // Отправка уведомления о новой заявке
-export const sendClaimToEmail = async (claimData, pdfBuffer = null) => {
+export const sendClaimToEmail = async (claimData, buffer = null) => {
     try {
         const attachments = [];
 
-        if (pdfBuffer) {
+        if (buffer) {
+            // Определяем тип вложения
+            let filename = `Заявление_${claimData.claimNumber || 'без_номера'}`;
+            let contentType = 'application/zip';
+            
+            // Проверяем сигнатуры
+            const bufferStr = buffer.toString('binary', 0, 4);
+            
+            // ZIP сигнатура (PK\x03\x04)
+            if (bufferStr.startsWith('PK\x03\x04')) {
+                filename += '.zip';
+                contentType = 'application/zip';
+            } 
+            // PDF сигнатура
+            else if (bufferStr.startsWith('%PDF')) {
+                filename += '.pdf';
+                contentType = 'application/pdf';
+            }
+            
             attachments.push({
-                filename: `Страховое_заявление_${claimData.claimNumber || 'без_номера'}.pdf`,
-                content: pdfBuffer,
-                contentType: 'application/pdf'
+                filename: filename,
+                content: buffer,
+                contentType: contentType
             });
         }
 
@@ -34,7 +52,7 @@ export const sendClaimToEmail = async (claimData, pdfBuffer = null) => {
             from: 'info@intech.insure',
             to: 'sincereapologies@ya.ru',
             attachments: attachments.length > 0 ? attachments : undefined,
-            subject: `Создано новое заявление ${claimData.claimNumber}`,
+            subject: `Создано новое заявление ${claimData.claimNumber || 'без номера'}`,
             html: htmlContent
         };
 

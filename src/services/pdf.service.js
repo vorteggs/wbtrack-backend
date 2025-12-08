@@ -5,6 +5,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
 import QRCode from 'qrcode';
+import crypto from 'crypto';
 
 // Получаем __dirname для ES модулей
 const __filename = fileURLToPath(import.meta.url);
@@ -19,10 +20,8 @@ const fonts = {
     }
 };
 
-// Создаем printer с вашими шрифтами
 const printer = new PdfPrinter(fonts);
 
-// Регистрируем шрифты для Canvas (если нужно)
 try {
     const fontPathNormal = path.join(__dirname, '../fonts/Times New Roman.ttf');
     const fontPathBold = path.join(__dirname, '../fonts/Times New Roman Bold.ttf');
@@ -38,12 +37,25 @@ try {
     console.warn('Не удалось зарегистрировать шрифты для Canvas:', error.message);
 }
 
-// Функции форматирования данных
 const formatDate = (dateString) => {
     if (!dateString) return 'Не указана';
     try {
         const date = new Date(dateString);
         return date.toLocaleDateString('ru-RU');
+    } catch {
+        return dateString;
+    }
+};
+
+// Функция для форматирования даты в формате "12 октября 2025 г."
+const formatDateLong = (dateString) => {
+    if (!dateString) return 'Не указана';
+    try {
+        const date = new Date(dateString);
+        const day = date.getDate();
+        const month = date.toLocaleString('ru-RU', { month: 'long' });
+        const year = date.getFullYear();
+        return `${day} ${month} ${year} г.`;
     } catch {
         return dateString;
     }
@@ -58,43 +70,50 @@ const formatPhone = (phone) => {
     return phone;
 };
 
-const formatPaymentMethod = (method) => {
-    const methods = {
-        'sbp': 'СБП (Система быстрых платежей)',
-        'card': 'Банковская карта',
-        'account': 'Банковский счет'
-    };
-    return methods[method] || method;
+const getPaymentMethodText = (method) => {
+    switch (method) {
+        case 'sbp': return 'СБП (Система быстрых платежей)';
+        case 'card': return 'Банковская карта';
+        case 'account': return 'Безналичный перевод на расчетный счет';
+        default: return 'Безналичный перевод на расчетный счет';
+    }
 };
 
 async function createEnhancedElectronicSignature(claimData) {
-    // Параметры canvas - приблизительная ширина области контента для A4
-    const scale = 6;
-    const displayWidth = 700; // Примерная ширина области контента PDF в пикселях
-    const displayHeight = 160; // Увеличиваем высоту для лучшего отображения
 
-    // Создаем canvas
+    const fullName = [
+        claimData.lastName || '',
+        claimData.firstName || '',
+        claimData.patronymic || ''
+    ].filter(Boolean).join(' ');
+
+    // Увеличиваем размер canvas для увеличения подписи и QR-кода
+    const scale = 8; // Увеличили scale для лучшего качества
+    const displayWidth = 800; // Увеличили ширину
+    const displayHeight = 250; // Увеличили высоту
+
     const canvas = createCanvas(displayWidth * scale, displayHeight * scale);
     const ctx = canvas.getContext('2d');
 
-    // Масштабируем для лучшего качества
     ctx.scale(scale, scale);
 
     // Фон
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, displayWidth, displayHeight);
 
+    // Возвращаем синий цвет для рамки и текста
     const primaryColor = '#0046dc';
+    const textColor = primaryColor; // Теперь весь текст внутри подписи синий
 
-    // Генерируем QR-код
+    // Генерируем QR-код ЧЕРНОГО цвета
     let qrCodeDataUrl;
     try {
-        const qrCodeText = claimData.claimNumber || `Claim-${Date.now()}`;
+        const qrCodeText = claimData.trackNumber || `Claim-${Date.now()}`;
         qrCodeDataUrl = await QRCode.toDataURL(qrCodeText, {
-            width: 80, // Изменить с 120 на 80
+            width: 140, // Увеличили размер QR-кода
             margin: 1,
             color: {
-                dark: primaryColor,
+                dark: '#000000', // Черный цвет QR-кода
                 light: '#ffffff'
             }
         });
@@ -122,20 +141,17 @@ async function createEnhancedElectronicSignature(claimData) {
         }
     }
 
-    // Разделяем на две равные колонки
     const columnWidth = displayWidth / 2;
 
     // 1. ЛЕВАЯ КОЛОНКА: ЭЛЕКТРОННАЯ ПОДПИСЬ
-    const signatureWidth = 300; // Уменьшить с 300
-    const signatureHeight = 140;
-
-    // Центрируем подпись в левой колонке
-    const signatureX = (columnWidth - signatureWidth) / 2;
+    const signatureWidth = 450; // Увеличили ширину подписи
+    const signatureHeight = 230; // Увеличили высоту подписи
+    const signatureX = (columnWidth - signatureWidth) / 2 + 50;
     const signatureY = (displayHeight - signatureHeight) / 2;
 
-    // Рисуем рамку для подписи
-    ctx.strokeStyle = primaryColor;
-    ctx.lineWidth = 1.5;
+    // Рисуем рамку для подписи - СИНИЙ цвет
+    ctx.strokeStyle = primaryColor; // Синий цвет рамки
+    ctx.lineWidth = 2;
     ctx.lineJoin = 'round';
     ctx.lineCap = 'round';
 
@@ -144,7 +160,7 @@ async function createEnhancedElectronicSignature(claimData) {
     const sigWidth = signatureWidth;
     const sigHeight = signatureHeight;
 
-    const radius = 12;
+    const radius = 20; // Увеличили радиус скругления
     ctx.beginPath();
     ctx.moveTo(sigX + radius, sigY);
     ctx.lineTo(sigX + sigWidth - radius, sigY);
@@ -160,56 +176,58 @@ async function createEnhancedElectronicSignature(claimData) {
 
     // Рисуем герб
     if (emblemImage) {
-        const emblemX = sigX + 15;
-        const emblemY = sigY + 20;
-        ctx.drawImage(emblemImage, emblemX, emblemY, 50, 50); // Увеличиваем герб
+        const emblemX = sigX + 30; // Увеличили отступ
+        const emblemY = sigY + 35; // Увеличили отступ
+        ctx.drawImage(emblemImage, emblemX, emblemY, 80, 80); // Увеличили размер герба
     } else {
         ctx.fillStyle = '#e3f2fd';
-        const emblemX = sigX + 15;
-        const emblemY = sigY + 20;
-        ctx.fillRect(emblemX, emblemY, 50, 50);
-        ctx.fillStyle = primaryColor;
-        ctx.font = 'bold 18px "Times New Roman"';
+        const emblemX = sigX + 30;
+        const emblemY = sigY + 35;
+        ctx.fillRect(emblemX, emblemY, 80, 80);
+        ctx.fillStyle = primaryColor; // Синий цвет для текста "РФ"
+        ctx.font = 'bold 28px "Times New Roman"'; // Увеличили шрифт
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText('РФ', emblemX + 25, emblemY + 25);
+        ctx.fillText('РФ', emblemX + 40, emblemY + 40);
     }
 
-    // Текст подписи
-    ctx.fillStyle = primaryColor;
+    // Текст подписи - СИНИЙ цвет
+    ctx.fillStyle = primaryColor; // Синий цвет текста
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
 
-    const textX = sigX + 80; // Смещаем текст правее герба
-    const textY = sigY + 25;
-    const lineHeight = 16;
+    const textX = sigX + 130; // Увеличили отступ
+    const textY = sigY + 40; // Увеличили отступ
+    const lineHeight = 22; // Увеличили межстрочный интервал
 
-    ctx.font = 'bold 13px "Times New Roman"';
+    ctx.font = 'bold 18px "Times New Roman"'; // Увеличили шрифт
     ctx.fillText('ДОКУМЕНТ ПОДПИСАН', textX, textY);
 
-    ctx.font = 'bold 13px "Times New Roman"';
+    ctx.font = 'bold 18px "Times New Roman"';
     ctx.fillText('ПРОСТОЙ', textX, textY + lineHeight);
 
-    ctx.font = 'bold 13px "Times New Roman"';
+    ctx.font = 'bold 18px "Times New Roman"';
     ctx.fillText('ЭЛЕКТРОННОЙ ПОДПИСЬЮ', textX, textY + lineHeight * 2);
 
-    // Нижний текст
-    const infoY = textY + lineHeight * 3 + 10;
-    ctx.font = '9px "Times New Roman"';
-    ctx.fillText('Сертификат: 12345678901234567890', sigX + 15, infoY);
-    ctx.fillText('Владелец: ' + (claimData.lastName || 'ФИО'), sigX + 15, infoY + 12);
-    ctx.fillText('Действителен: с ' + new Date().toLocaleDateString('ru-RU'), sigX + 15, infoY + 24);
+    // Нижний текст - ТЕПЕРЬ ТОЖЕ СИНИЙ
+    const infoY = textY + lineHeight * 3 + 20;
+    ctx.fillStyle = primaryColor; // Теперь синий цвет для информационного текста
+    ctx.font = '12px "Times New Roman"'; // Увеличили шрифт
+    ctx.fillText(fullName, sigX + 30, infoY);
+    ctx.fillText(new Date().toISOString(), sigX + 30, infoY + 16);
+    ctx.fillText('Отправка sms с кодом от insuranceclaim на ' + claimData.phone, sigX + 30, infoY + 32);
+    ctx.fillText('и ввод кода в форме создания заявления', sigX + 30, infoY + 48);
+    ctx.fillText('Hash ЭД: ' + crypto.randomBytes(16).toString('hex'), sigX + 30, infoY + 64);
+
 
     // 2. ПРАВАЯ КОЛОНКА: QR-КОД
-    const qrCodeSize = 80; // Увеличиваем QR-код
-
-    // Центрируем QR-код в правой колонке
-    const qrCodeX = columnWidth + (columnWidth - qrCodeSize) / 2;
+    const qrCodeSize = 140; // Увеличили размер QR-кода
+    const qrCodeX = columnWidth + (columnWidth - qrCodeSize) / 2 + 50;
     const qrCodeY = (displayHeight - qrCodeSize) / 2;
 
     // Рисуем фон для QR-кода
-    ctx.fillStyle = '#ffffffff';
-    ctx.fillRect(qrCodeX - 10, qrCodeY - 10, qrCodeSize + 20, qrCodeSize + 20);
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(qrCodeX - 20, qrCodeY - 20, qrCodeSize + 40, qrCodeSize + 40);
 
     // Рисуем QR-код
     if (qrCodeImage) {
@@ -217,215 +235,285 @@ async function createEnhancedElectronicSignature(claimData) {
     } else {
         ctx.fillStyle = '#f0f0f0';
         ctx.fillRect(qrCodeX, qrCodeY, qrCodeSize, qrCodeSize);
-        ctx.fillStyle = '#999';
-        ctx.font = 'bold 20px "Times New Roman"';
+        ctx.fillStyle = textColor;
+        ctx.font = 'bold 28px "Times New Roman"'; // Увеличили шрифт
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText('QR', qrCodeX + qrCodeSize / 2, qrCodeY + qrCodeSize / 2);
     }
 
-    // Конвертируем в base64
     const dataUrl = canvas.toDataURL('image/png');
     return dataUrl;
 }
 
-// Генерация PDF документа
+
+
 export const generateClaimPDF = async (claimData) => {
     return new Promise(async (resolve, reject) => {
         try {
-            // Создаем электронную подпись
             const signatureImage = await createEnhancedElectronicSignature(claimData);
+
+            // Формируем ФИО
+            const fullName = [
+                claimData.lastName || '',
+                claimData.firstName || '',
+                claimData.patronymic || ''
+            ].filter(Boolean).join(' ');
+
+            // Формируем паспортные данные
+            const passportInfo = [
+                claimData.passportSeries ? `серия ${claimData.passportSeries}` : '',
+                claimData.passportNumber ? `номер ${claimData.passportNumber}` : ''
+            ].filter(Boolean).join(', ');
+
+            // Текущая дата в формате "12 октября 2025 г."
+            const formattedDate = formatDateLong(new Date());
+
+            // Способ получения возмещения
+            const paymentMethodText = getPaymentMethodText(claimData.paymentMethod);
+
+            // Для СБП: используем recipientPhone, если есть, иначе phone
+            const sbpPhone = claimData.recipientPhone || claimData.phone || '_____';
 
             // Создаем документ
             const docDefinition = {
                 content: [
+                    // Две колонки: данные заявителя и страховой компании
+                    {
+                        columns: [
+                            // Левая колонка - данные заявителя
+                            {
+                                stack: [
+                                    {
+                                        text: [
+                                            { text: 'От: ' + fullName || '_____', margin: [0, 2, 0, 5], color: '#000000' },
+                                            '\nДата рождения: ' + (claimData.birthDate ? formatDate(claimData.birthDate) : '_____'),
+                                            '\nКонтактный телефон: ' + (claimData.phone ? formatPhone(claimData.phone) : '_____'),
+                                            '\nПаспортные данные: ' + passportInfo,
+                                        ],
+                                        lineHeight: 1.3,
+                                        color: '#000000'
+                                    }
+                                ],
+                                width: '50%'
+                            },
+                            // Правая колонка - данные страховой компании
+                            {
+                                stack: [
+                                    {
+                                        text: [
+                                            { text: 'В: ПАО СК "Ингосстрах"\n', fontSize: 12, color: '#000000' },
+                                            '(Отдел урегулирования убытков)\n',
+                                            { text: 'Адрес: 127994, г. Москва, ул. Ильинка, д. 8\n', italics: true, color: '#000000' },
+                                        ],
+                                        lineHeight: 1.3,
+                                        alignment: 'right'
+                                    }
+                                ],
+                                width: '50%'
+                            }
+                        ],
+                        margin: [0, 0, 0, 20]
+                    },
+
                     // Заголовок
                     {
                         text: 'ЗАЯВЛЕНИЕ О СТРАХОВОМ ВОЗМЕЩЕНИИ',
                         style: 'header',
-                        margin: [0, 0, 0, 10]
+                        margin: [0, 0, 0, 5],
+                        color: '#000000'
                     },
                     {
-                        text: '(ПОТЕРЯ/ПОВРЕЖДЕНИЕ ПОСЫЛКИ)',
+                        text: '(ГРУЗОПЕРЕВОЗКИ)',
                         style: 'subheader',
-                        margin: [0, 0, 0, 20]
+                        margin: [0, 0, 0, 20],
+                        color: '#000000'
                     },
 
-                    // Основная информация
-                    { text: '1. ОСНОВНАЯ ИНФОРМАЦИЯ', style: 'sectionTitle' },
+                    // Основной текст заявления
                     {
-                        table: {
-                            widths: ['30%', '70%'],
-                            body: [
-                                ['Дата создания:', formatDate(claimData.createdAt)],
-                                ['Номер заявки:', claimData.claimNumber || 'Не указан'],
-                                ['Трек-номер посылки:', claimData.trackNumber || 'Не указан'],
-                                ['Статус:', 'Новая заявка']
-                            ]
-                        },
-                        style: 'dataTable',
-                        margin: [0, 0, 0, 15]
+                        text: [
+                            'Прошу рассмотреть настоящее заявление о страховом событии, произошедшем ',
+                            { text: claimData.eventDate ? formatDateLong(claimData.eventDate) : '_____', bold: true, color: '#000000' },
+                            ' во время перевозки отправления с трек-номером ',
+                            { text: claimData.trackNumber || '_____', bold: true, color: '#000000' },
+                            '. ',
+                        ],
+                        lineHeight: 1.3,
+                        margin: [0, 0, 0, 15],
+                        color: '#000000'
                     },
 
-                    // Личные данные
-                    { text: '2. ДАННЫЕ ЗАЯВИТЕЛЯ', style: 'sectionTitle' },
+                    // Договор и полис
                     {
-                        table: {
-                            widths: ['30%', '70%'],
-                            body: [
-                                ['Фамилия:', claimData.lastName || 'Не указана'],
-                                ['Имя:', claimData.firstName || 'Не указано'],
-                                ['Отчество:', claimData.patronymic || 'Не указано'],
-                                ['Дата рождения:', formatDate(claimData.birthDate)],
-                                ['Телефон:', formatPhone(claimData.phone)]
-                            ]
-                        },
-                        style: 'dataTable',
-                        margin: [0, 0, 0, 15]
+                        text: [
+                            'Договор перевозки № ',
+                            { text: claimData.transportContractNumber || '_____', bold: true, color: '#000000' },
+                            ' от ',
+                            { text: claimData.transportContractDate ? formatDateLong(claimData.transportContractDate) : '_____', bold: true, color: '#000000' }
+                        ],
+                        margin: [0, 0, 0, 10],
+                        color: '#000000'
                     },
-
-                    // Паспортные данные
-                    { text: '3. ПАСПОРТНЫЕ ДАННЫЕ', style: 'sectionTitle' },
                     {
-                        table: {
-                            widths: ['30%', '70%'],
-                            body: [
-                                ['Тип документа:', claimData.documentType || 'Не указан'],
-                                ['Серия паспорта:', claimData.passportSeries || 'Не указана'],
-                                ['Номер паспорта:', claimData.passportNumber || 'Не указан']
-                            ]
-                        },
-                        style: 'dataTable',
-                        margin: [0, 0, 0, 15]
+                        text: [
+                            'Страховой полис № ',
+                            { text: claimData.policyNumber || '_____', bold: true, color: '#000000' },
+                            '.'
+                        ],
+                        margin: [0, 0, 0, 15],
+                        color: '#000000'
                     },
 
-                    // Способ выплаты
-                    { text: '4. СПОСОБ ВЫПЛАТЫ ВОЗМЕЩЕНИЯ', style: 'sectionTitle' },
+                    // Описание ситуации
                     {
-                        table: {
-                            widths: ['30%', '70%'],
-                            body: [
-                                ['Метод выплаты:', formatPaymentMethod(claimData.paymentMethod)]
-                            ]
-                        },
-                        style: 'dataTable',
-                        margin: [0, 0, 0, 10]
+                        text: [
+                            'Описание ситуации:\n',
+                            { text: claimData.eventDescription || '_____', bold: true, color: '#000000' }
+                        ],
+                        lineHeight: 1.3,
+                        margin: [0, 0, 0, 15],
+                        color: '#000000'
                     },
 
-                    // Дополнительные данные в зависимости от способа выплаты
-                    ...(claimData.paymentMethod === 'sbp' ? [
-                        { text: 'Данные для выплаты через СБП:', style: 'subsection' },
-                        {
-                            table: {
-                                widths: ['30%', '70%'],
-                                body: [
-                                    ['Банк получателя:', claimData.bankName || 'Не указан'],
-                                    ['Телефон получателя:', formatPhone(claimData.recipientPhone)]
-                                ]
-                            },
-                            style: 'dataTable',
-                            margin: [0, 0, 0, 15]
-                        }
-                    ] : []),
+                    // Сумма ущерба
+                    {
+                        text: [
+                            'Заявленная сумма ущерба: ',
+                            { text: claimData.price ? `${claimData.price} руб.` : '_____ руб.', bold: true, color: '#000000' }
+                        ],
+                        margin: [0, 0, 0, 15],
+                        color: '#000000'
+                    },
 
-                    ...(claimData.paymentMethod === 'card' ? [
-                        { text: 'Данные банковской карты:', style: 'subsection' },
-                        {
-                            table: {
-                                widths: ['30%', '70%'],
-                                body: [
-                                    ['Номер карты:', claimData.cardNumber || 'Не указан']
-                                ]
-                            },
-                            style: 'dataTable',
-                            margin: [0, 0, 0, 15]
-                        }
-                    ] : []),
+                    // Способ получения возмещения
+                    {
+                        text: [
+                            'Способ получения возмещения: ',
+                            { text: paymentMethodText, bold: true, color: '#000000' }
+                        ],
+                        margin: [0, 0, 0, 20],
+                        color: '#000000'
+                    },
 
+                    // Платежные реквизиты
+                    {
+                        text: 'Платежные реквизиты:',
+                        style: 'sectionHeader',
+                        margin: [0, 0, 0, 10],
+                        color: '#000000'
+                    },
+
+                    // Реквизиты для банковского счета
                     ...(claimData.paymentMethod === 'account' ? [
-                        { text: 'Банковские реквизиты:', style: 'subsection' },
-                        {
-                            table: {
-                                widths: ['30%', '70%'],
-                                body: [
-                                    ['БИК банка:', claimData.bankBic || 'Не указан'],
-                                    ['Номер счета:', claimData.accountNumber || 'Не указан'],
-                                    ['Название банка:', claimData.bankName || 'Не указан']
-                                ]
-                            },
-                            style: 'dataTable',
-                            margin: [0, 0, 0, 15]
-                        }
+                        { text: 'Расчетный счет: ' + (claimData.accountNumber || '_____'), margin: [0, 0, 0, 5], color: '#000000' },
+                        { text: 'Банк получателя: ' + (claimData.bankName || '_____'), margin: [0, 0, 0, 5], color: '#000000' },
+                        { text: 'БИК: ' + (claimData.bankBic || '_____'), margin: [0, 0, 0, 5], color: '#000000' },
                     ] : []),
 
+                    // Реквизиты для карты
+                    ...(claimData.paymentMethod === 'card' ? [
+                        {
+                            columns: [
+                                { text: 'Получатель:', width: '30%', color: '#000000' },
+                                { text: fullName || '_____', width: '70%', decoration: 'underline', color: '#000000' }
+                            ],
+                            margin: [0, 0, 0, 5]
+                        },
+                        { text: 'Номер карты: ' + (claimData.cardNumber || '_____'), margin: [0, 0, 0, 5], color: '#000000' }
+                    ] : []),
 
-                    // Вставляем изображение подписи
+                    // Реквизиты для СБП
+                    ...(claimData.paymentMethod === 'sbp' ? [
+                        {
+                            columns: [
+                                { text: 'Получатель:', width: '30%', color: '#000000' },
+                                { text: fullName || '_____', width: '70%', decoration: 'underline', color: '#000000' }
+                            ],
+                            margin: [0, 0, 0, 5]
+                        },
+                        { text: 'Телефон получателя: ' + (sbpPhone ? formatPhone(sbpPhone) : '_____'), margin: [0, 0, 0, 5], color: '#000000' },
+                        { text: 'Банк получателя: ' + (claimData.bankName || '_____'), margin: [0, 0, 0, 5], color: '#000000' }
+                    ] : []),
+
+                    { text: '\n', margin: [0, 0, 0, 15] },
+
+                    // Подпись и дата
+                    {
+                        columns: [
+                            {
+                                stack: [
+                                    {
+                                        text: [
+                                            'С уважением, ',
+                                            { text: '_____', bold: true, color: '#000000' },
+                                            ' / ',
+                                            { text: fullName, bold: true, color: '#000000' },
+                                            '\n\n',
+                                            { text: '    (Подпись)', italics: true, fontSize: 9, color: '#000000' },
+                                            { text: '    (Расшифровка подписи)', italics: true, fontSize: 9, color: '#000000' }
+                                        ]
+                                    }
+                                ],
+                                width: '70%'
+                            },
+                            {
+                                stack: [
+                                    {
+                                        text: [
+                                            'Дата: ',
+                                            { text: formattedDate, bold: true, color: '#000000' }
+                                        ],
+                                        alignment: 'right'
+                                    }
+                                ],
+                                width: '30%'
+                            }
+                        ],
+                        margin: [0, 0, 0, 40]
+                    },
+
+                    // Электронная подпись (увеличили ширину)
                     {
                         image: signatureImage,
-                        width: 500, // Уменьшить с 500 до 300-350
-                        margin: [10, 100, 0, 20],
+                        width: 500, // Увеличили ширину подписи в PDF
+                        margin: [100, 20, 0, 0],
                         alignment: 'center'
-                    },
-
+                    }
                 ],
 
-                // Стили документа
                 styles: {
                     header: {
                         fontSize: 16,
                         bold: true,
                         alignment: 'center',
-                        color: '#2c3e50'
+                        color: '#000000'
                     },
                     subheader: {
                         fontSize: 14,
                         bold: true,
                         alignment: 'center',
-                        color: '#34495e'
+                        color: '#000000'
                     },
-                    sectionTitle: {
+                    sectionHeader: {
                         fontSize: 12,
                         bold: true,
-                        margin: [0, 10, 0, 5],
-                        color: '#2c3e50'
-                    },
-                    subsection: {
-                        fontSize: 11,
-                        bold: true,
-                        margin: [0, 5, 0, 5],
-                        color: '#34495e'
-                    },
-                    dataTable: {
-                        fontSize: 10,
-                        color: '#2c3e50'
-                    },
-                    disclaimer: {
-                        fontSize: 9,
-                        color: '#7f8c8d',
-                        italics: true
-                    },
-                    footerNote: {
-                        fontSize: 8,
-                        color: '#95a5a6',
-                        italics: true
+                        color: '#000000'
                     }
                 },
 
-                // Стили по умолчанию
                 defaultStyle: {
-                    fontSize: 10,
-                    font: 'Roboto'
+                    fontSize: 11,
+                    font: 'Roboto',
+                    lineHeight: 1.0,
+                    color: '#000000'
                 },
 
-                // Поля страницы
                 pageMargins: [40, 40, 40, 40],
-
             };
 
-            // Создаем PDF
             const pdfDoc = printer.createPdfKitDocument(docDefinition);
 
-            // Собираем буфер
             const chunks = [];
             pdfDoc.on('data', chunk => chunks.push(chunk));
             pdfDoc.on('end', () => {
