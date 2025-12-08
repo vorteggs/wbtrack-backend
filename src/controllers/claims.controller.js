@@ -34,7 +34,7 @@ export const claimsController = {
         const newClaim = await createClaim(req.body);
         const pdfBuffer = await generateClaimPDF(newClaim);
 
-        await sendClaimToEmail(newClaim, pdfBuffer);
+        // await sendClaimToEmail(newClaim, pdfBuffer);
 
         // // Успешный ответ
         res.status(201).json({
