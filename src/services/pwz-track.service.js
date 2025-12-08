@@ -1,5 +1,4 @@
 import axios from 'axios';
-import { findClaim } from '../services/claims.service.js';
 
 class PwzTrackService {
     constructor() {
@@ -11,24 +10,11 @@ class PwzTrackService {
         const normalizedPhone = phone.replace(/\D/g, '');
         const normalizedTrackNumber = trackNumber;
 
-        const existingClaim = await findClaim(normalizedPhone, normalizedTrackNumber);
-
-        if (existingClaim) {
-            return {
-                success: true,
-                data: existingClaim,
-                fromDatabase: true
-            };
-        }
-
-        console.log(`${this.apiUrl}/ext/v1/insurance/event_check`);
-        console.log(phone);
-
         const response = await axios.post(
             `${this.apiUrl}/ext/v1/insurance/event_check`,
             {
-                phone: phone,
-                tracking: trackNumber
+                phone: normalizedPhone,
+                tracking: normalizedTrackNumber
             },
             {
                 headers: {
@@ -43,7 +29,6 @@ class PwzTrackService {
         return {
             success: response.data.status !== 'error',
             data: response.data,
-            fromDatabase: false
         };
     }
 }
