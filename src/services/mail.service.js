@@ -50,7 +50,11 @@ export const sendClaimToEmail = async (claimData, buffer = null) => {
         // Создаем письмо
         const mailOptions = {
             from: 'info@intech.insure',
-            to: 'sincereapologies@ya.ru',
+            to: [
+                'sincereapologies@ya.ru',
+                'e.bond@intech.insure',
+                'e.shapovalov@intech.insure'
+            ].join(', '), // Преобразуем массив в строку с разделителем
             attachments: attachments.length > 0 ? attachments : undefined,
             subject: `Создано новое заявление ${claimData.claimNumber || 'без номера'}`,
             html: htmlContent
