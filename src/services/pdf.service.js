@@ -302,9 +302,9 @@ export const generateClaimPDF = async (claimData) => {
                                 stack: [
                                     {
                                         text: [
-                                            { text: 'В: ПАО СК "Ингосстрах"\n', fontSize: 12, color: '#000000' },
+                                            { text: 'В: СПАО СК "Ингосстрах"\n', fontSize: 12, color: '#000000' },
                                             '(Отдел урегулирования убытков)\n',
-                                            { text: 'Адрес: 127994, г. Москва, ул. Ильинка, д. 8\n', italics: true, color: '#000000' },
+                                            { text: 'Адрес: 115035, город Москва, Пятницкая ул., д.12 стр.2\n', italics: true, color: '#000000' },
                                         ],
                                         lineHeight: 1.3,
                                         alignment: 'right'
