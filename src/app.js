@@ -17,6 +17,7 @@ app.use(express.json());
 app.post('/api/checkParcel', pwzTrackController.checkParcel);
 app.post('/api/createClaim', claimsController.create)
 app.post('/api/getBankName', dadataController.getBankName)
+app.post('/api/getClaimPDF', claimsController.getPDF)
 
 // Health check
 app.get('/health', (req, res) => {

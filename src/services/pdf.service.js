@@ -278,42 +278,31 @@ export const generateClaimPDF = async (claimData) => {
             // Создаем документ
             const docDefinition = {
                 content: [
-                    // Две колонки: данные заявителя и страховой компании
+                    // Данные заявителя
                     {
-                        columns: [
-                            // Левая колонка - данные заявителя
-                            {
-                                stack: [
-                                    {
-                                        text: [
-                                            { text: 'От: ' + fullName || '_____', margin: [0, 2, 0, 5], color: '#000000' },
-                                            '\nДата рождения: ' + (claimData.birthDate ? formatDate(claimData.birthDate) : '_____'),
-                                            '\nКонтактный телефон: ' + (claimData.phone ? formatPhone(claimData.phone) : '_____'),
-                                            '\nПаспортные данные: ' + passportInfo,
-                                        ],
-                                        lineHeight: 1.3,
-                                        color: '#000000'
-                                    }
-                                ],
-                                width: '50%'
-                            },
-                            // Правая колонка - данные страховой компании
-                            {
-                                stack: [
-                                    {
-                                        text: [
-                                            { text: 'В: СПАО "Ингосстрах"\n', fontSize: 12, color: '#000000' },
-                                            '(Отдел урегулирования убытков)\n',
-                                            { text: 'Адрес: 115035, город Москва, Пятницкая ул., д.12 стр.2\n', italics: true, color: '#000000' },
-                                        ],
-                                        lineHeight: 1.3,
-                                        alignment: 'right'
-                                    }
-                                ],
-                                width: '50%'
-                            }
+                        text: [
+                            'От: ' + (fullName || '_____'),
+                            '\nДата рождения: ' + (claimData.birthDate ? formatDate(claimData.birthDate) : '_____'),
+                            '\nКонтактный телефон: ' + (claimData.phone ? formatPhone(claimData.phone) : '_____'),
+                            '\nПаспортные данные: ' + passportInfo,
                         ],
-                        margin: [0, 0, 0, 20]
+                        lineHeight: 1.0,
+                        margin: [0, 0, 0, 5],
+                        alignment: 'left',
+                        color: '#000000'
+                    },
+
+                    // Данные страховой компании
+                    {
+                        text: [
+                            'В: СПАО "Ингосстрах"',
+                            '\n(Отдел урегулирования убытков)',
+                            '\nАдрес: 115035, город Москва, Пятницкая ул., д.12 стр.2',
+                        ],
+                        lineHeight: 1.0,
+                        margin: [0, 0, 0, 10],
+                        alignment: 'right',
+                        color: '#000000'
                     },
 
                     // Заголовок
@@ -326,7 +315,7 @@ export const generateClaimPDF = async (claimData) => {
                     {
                         text: '(ГРУЗОПЕРЕВОЗКИ)',
                         style: 'subheader',
-                        margin: [0, 0, 0, 20],
+                        margin: [0, 0, 0, 10],
                         color: '#000000'
                     },
 
@@ -339,8 +328,8 @@ export const generateClaimPDF = async (claimData) => {
                             { text: claimData.trackNumber || '_____', bold: true, color: '#000000' },
                             '. ',
                         ],
-                        lineHeight: 1.3,
-                        margin: [0, 0, 0, 15],
+                        lineHeight: 1.0,
+                        margin: [0, 0, 0, 10],
                         color: '#000000'
                     },
 
@@ -352,7 +341,7 @@ export const generateClaimPDF = async (claimData) => {
                             ' от ',
                             { text: claimData.transportContractDate ? formatDateLong(claimData.transportContractDate) : '_____', bold: true, color: '#000000' }
                         ],
-                        margin: [0, 0, 0, 10],
+                        margin: [0, 0, 0, 5],
                         color: '#000000'
                     },
                     {
@@ -361,7 +350,7 @@ export const generateClaimPDF = async (claimData) => {
                             { text: claimData.policyNumber || '_____', bold: true, color: '#000000' },
                             '.'
                         ],
-                        margin: [0, 0, 0, 15],
+                        margin: [0, 0, 0, 10],
                         color: '#000000'
                     },
 
@@ -371,8 +360,8 @@ export const generateClaimPDF = async (claimData) => {
                             'Описание ситуации:\n',
                             { text: claimData.eventDescription || '_____', bold: true, color: '#000000' }
                         ],
-                        lineHeight: 1.3,
-                        margin: [0, 0, 0, 15],
+                        lineHeight: 1.0,
+                        margin: [0, 0, 0, 10],
                         color: '#000000'
                     },
 
@@ -382,7 +371,7 @@ export const generateClaimPDF = async (claimData) => {
                             'Заявленная сумма ущерба: ',
                             { text: claimData.price ? `${claimData.price} руб.` : '_____ руб.', bold: true, color: '#000000' }
                         ],
-                        margin: [0, 0, 0, 15],
+                        margin: [0, 0, 0, 10],
                         color: '#000000'
                     },
 
@@ -392,7 +381,24 @@ export const generateClaimPDF = async (claimData) => {
                             'Способ получения возмещения: ',
                             { text: paymentMethodText, bold: true, color: '#000000' }
                         ],
-                        margin: [0, 0, 0, 20],
+                        margin: [0, 0, 0, 10],
+                        color: '#000000'
+                    },
+
+                    // Гарантии и заверения
+                    {
+                        text: [
+                            'Настоящим гарантирую и заверяю, что имею имущественный интерес в грузе, перевозимом по Трек номеру отправления ',
+                            { text: claimData.trackNumber || '________', bold: true, color: '#000000' },
+                            '.\n',
+                            'Также заверяю, что объявленная стоимость груза составляет ',
+                            { text: claimData.price ? `${claimData.price} рублей.` : '________ рублей.', bold: true, color: '#000000' },
+                            '\n',
+                            'Последствия нарушения заверений, предусмотренных ст. 431.2 ГК РФ, до меня доведены и мне понятны.\n',
+                            'Все сведения, изложенные мной, являются достоверными и правдивыми.'
+                        ],
+                        lineHeight: 1.0,
+                        margin: [0, 0, 0, 10],
                         color: '#000000'
                     },
 
@@ -400,7 +406,7 @@ export const generateClaimPDF = async (claimData) => {
                     {
                         text: 'Платежные реквизиты:',
                         style: 'sectionHeader',
-                        margin: [0, 0, 0, 10],
+                        margin: [0, 0, 0, 5],
                         color: '#000000'
                     },
 
@@ -436,48 +442,38 @@ export const generateClaimPDF = async (claimData) => {
                         { text: 'Банк получателя: ' + (claimData.bankName || '_____'), margin: [0, 0, 0, 5], color: '#000000' }
                     ] : []),
 
-                    { text: '\n', margin: [0, 0, 0, 15] },
+                    { text: '\n', margin: [0, 0, 0, 5] },
 
-                    // Подпись и дата
+                    // Подпись
                     {
-                        columns: [
-                            {
-                                stack: [
-                                    {
-                                        text: [
-                                            'С уважением, ',
-                                            { text: '_____', bold: true, color: '#000000' },
-                                            ' / ',
-                                            { text: fullName, bold: true, color: '#000000' },
-                                            '\n\n',
-                                            { text: '    (Подпись)', italics: true, fontSize: 9, color: '#000000' },
-                                            { text: '    (Расшифровка подписи)', italics: true, fontSize: 9, color: '#000000' }
-                                        ]
-                                    }
-                                ],
-                                width: '70%'
-                            },
-                            {
-                                stack: [
-                                    {
-                                        text: [
-                                            'Дата: ',
-                                            { text: formattedDate, bold: true, color: '#000000' }
-                                        ],
-                                        alignment: 'right'
-                                    }
-                                ],
-                                width: '30%'
-                            }
+                        text: [
+                            'С уважением, ',
+                            { text: '_____', bold: true, color: '#000000' },
+                            ' / ',
+                            { text: fullName, bold: true, color: '#000000' },
+                            '\n',
+                            { text: '    (Подпись)', italics: true, fontSize: 9, color: '#000000' },
+                            { text: '    (Расшифровка подписи)', italics: true, fontSize: 9, color: '#000000' }
                         ],
-                        margin: [0, 0, 0, 40]
+                        margin: [0, 0, 0, 5],
+                        color: '#000000'
+                    },
+                    // Дата
+                    {
+                        text: [
+                            'Дата: ',
+                            { text: formattedDate, bold: true, color: '#000000' }
+                        ],
+                        alignment: 'right',
+                        margin: [0, 0, 0, 10],
+                        color: '#000000'
                     },
 
                     // Электронная подпись (увеличили ширину)
                     {
                         image: signatureImage,
                         width: 500, // Увеличили ширину подписи в PDF
-                        margin: [100, 20, 0, 0],
+                        margin: [100, 10, 0, 0],
                         alignment: 'center'
                     }
                 ],
@@ -486,13 +482,13 @@ export const generateClaimPDF = async (claimData) => {
                     header: {
                         fontSize: 16,
                         bold: true,
-                        alignment: 'center',
+                        alignment: 'left',
                         color: '#000000'
                     },
                     subheader: {
                         fontSize: 14,
                         bold: true,
-                        alignment: 'center',
+                        alignment: 'left',
                         color: '#000000'
                     },
                     sectionHeader: {

@@ -138,5 +138,34 @@ export const claimsController = {
                 error: error.message
             });
         }
+    },
+
+    async getPDF(req, res) {
+        try {
+            // Генерируем PDF из данных запроса
+            const pdfBuffer = await generateClaimPDF(req.body);
+
+            // Формируем имя файла
+            const claimNumber = req.body.claimNumber || `claim_${Date.now()}`;
+            const filename = `Заявление_${claimNumber}.pdf`;
+            const encodedFilename = encodeURIComponent(filename);
+
+            // Устанавливаем заголовки для возврата PDF
+            res.setHeader('Content-Type', 'application/pdf');
+            // Используем оба варианта для совместимости: ASCII для старых браузеров и UTF-8 для современных
+            res.setHeader('Content-Disposition', `inline; filename="Zayavlenie_${claimNumber}.pdf"; filename*=UTF-8''${encodedFilename}`);
+            res.setHeader('Content-Length', pdfBuffer.length);
+
+            // Отправляем PDF
+            res.send(pdfBuffer);
+
+        } catch (error) {
+            console.error('Ошибка при генерации PDF:', error);
+            res.status(500).json({
+                success: false,
+                message: 'Ошибка при генерации PDF',
+                error: error.message
+            });
+        }
     }
 };
